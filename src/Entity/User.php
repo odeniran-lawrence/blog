@@ -12,6 +12,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[ORM\HasLifecycleCallbacks] // Gestion auto des évènements par Doctrine
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
@@ -41,19 +42,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeImmutable $updated_at = null;
 
     #[ORM\Column]
-    private ?int $warningCount = null;
+    private ?int $warningCount = 0;
 
     #[ORM\Column]
-    private ?bool $is_banned = null;
+    private ?bool $is_banned = false;
 
     #[ORM\Column]
-    private ?bool $is_active = null;
+    private ?bool $is_active = false;
 
     /**
      * @var Collection<int, Article>
      */
     #[ORM\OneToMany(targetEntity: Article::class, mappedBy: 'author')]
-    private Collection $article;
+    private Collection $articles;
 
     /**
      * @var Collection<int, Comment>
@@ -63,8 +64,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct()
     {
-        $this->article = new ArrayCollection();
+        $this->articles = new ArrayCollection();
         $this->comments = new ArrayCollection();
+    }
+        /**
+     * Les évènements du cycle de vie de l'entité
+     * La mise à jour des dates de création et de modification de l'entité
+     */
+    #[ORM\PrePersist] // Premier enregistrement d'un objet de l'entité
+    public function setCreatedAtValue(): void
+    {
+        $this->created_at = new \DateTimeImmutable();
+        $this->updated_at = new \DateTimeImmutable();
+    }
+
+    #[ORM\PreUpdate] // Modification d'un objet de l'entité
+    public function setUpdatedAtValue(): void
+    {
+        $this->updated_at = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -203,15 +220,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @return Collection<int, Article>
      */
-    public function getArticle(): Collection
+    public function getArticles(): Collection
     {
-        return $this->article;
+        return $this->articles;
     }
 
     public function addArticle(Article $article): static
     {
-        if (!$this->article->contains($article)) {
-            $this->article->add($article);
+        if (!$this->articles->contains($article)) {
+            $this->articles->add($article);
             $article->setAuthor($this);
         }
 
@@ -220,7 +237,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function removeArticle(Article $article): static
     {
-        if ($this->article->removeElement($article)) {
+        if ($this->articles->removeElement($article)) {
             // set the owning side to null (unless already changed)
             if ($article->getAuthor() === $this) {
                 $article->setAuthor(null);

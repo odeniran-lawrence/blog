@@ -7,12 +7,17 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CommentRepository::class)]
+#[ORM\HasLifecycleCallbacks] // Gestion auto des évènements par Doctrine
 class Comment
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
+
+    #[ORM\ManyToOne(inversedBy: 'comments')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?User $author = null;
 
     #[ORM\Column(type: Types::TEXT)]
     private ?string $content = null;
@@ -30,13 +35,31 @@ class Comment
     #[ORM\JoinColumn(nullable: false)]
     private ?Article $article = null;
 
-    #[ORM\ManyToOne(inversedBy: 'comments')]
-    #[ORM\JoinColumn(nullable: false)]
-    private ?User $author = null;
+    /**
+     * Les évènements du cycle de vie de l'entité
+     * La mise à jour des dates de création de l'entité
+     */
+    #[ORM\PrePersist] // Premier enregistrement d'un objet de l'entité
+    public function setCreatedAtValue(): void
+    {
+        $this->created_at = new \DateTimeImmutable();
+    }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getAuthor(): ?User
+    {
+        return $this->author;
+    }
+
+    public function setAuthor(?User $author): static
+    {
+        $this->author = $author;
+
+        return $this;
     }
 
     public function getContent(): ?string
@@ -95,18 +118,6 @@ class Comment
     public function setArticle(?Article $article): static
     {
         $this->article = $article;
-
-        return $this;
-    }
-
-    public function getAuthor(): ?User
-    {
-        return $this->author;
-    }
-
-    public function setAuthor(?User $author): static
-    {
-        $this->author = $author;
 
         return $this;
     }

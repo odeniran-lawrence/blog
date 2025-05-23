@@ -7,9 +7,10 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ArticleRepository::class)]
-#[ORM\HasLifecycleCallbacks]// Gestion auto des évenements par Doctrine
+#[ORM\HasLifecycleCallbacks] // Gestion auto des évènements par Doctrine
 class Article
 {
     #[ORM\Id]
@@ -18,24 +19,25 @@ class Article
     private ?int $id = null;
 
     #[ORM\Column(length: 100)]
+    #[Assert\Length(min: 2, max: 100, message: 'Le titre contient au minimum {{ min }} caractères et au maximum {{ max }} caractères')]
     private ?string $title = null;
 
-    /**
-     * @var Collection<int, Block>
-     */
-    #[ORM\ManyToMany(targetEntity: Block::class, mappedBy: 'articles')]
-    private Collection $blocks;
-
     #[ORM\Column(length: 255)]
+    #[Assert\Length(max: 255, message: '{{ max }} caractères maximum')]
+    #[Assert\Regex(pattern: '/^[a-z0-9-]+$/')]
     private ?string $slug = null;
-
+    
     #[ORM\Column(length: 255)]
-    private ?string $image = null;
+    #[Assert\Length(max: 255, message: '{{ max }} caractères maximum')]
+    #[Assert\Regex(pattern: '/\.(jpg|jpeg|png|webp)$/')]
+    private ?string $image = 'default.png';
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255, message: '{{ max }} caractères maximum')]
     private ?string $keywords = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255, message: '{{ max }} caractères maximum')]
     private ?string $description = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -54,14 +56,20 @@ class Article
     private ?\DateTimeImmutable $updated_at = null;
 
     /**
+     * @var Collection<int, Block>
+     */
+    #[ORM\ManyToMany(targetEntity: Block::class, mappedBy: 'articles')]
+    private Collection $blocks;
+
+    #[ORM\ManyToOne(inversedBy: 'articles')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?User $author = null;
+
+    /**
      * @var Collection<int, Comment>
      */
     #[ORM\OneToMany(targetEntity: Comment::class, mappedBy: 'article', orphanRemoval: true)]
     private Collection $comments;
-
-    #[ORM\ManyToOne(inversedBy: 'article')]
-    #[ORM\JoinColumn(nullable: false)]
-    private ?User $author = null;
 
     public function __construct()
     {
@@ -70,21 +78,21 @@ class Article
     }
 
     /**
-     * Les évements de la vie cycle de l'entité
+     * Les évènements du cycle de vie de l'entité
      * La mise à jour des dates de création et de modification de l'entité
      */
-    #[ORM\PrePersist]
-    public function setCreatedAtValue(\DateTimeImmutable $created_at): void
+    #[ORM\PrePersist] // Premier enregistrement d'un objet de l'entité
+    public function setCreatedAtValue(): void
     {
-        $this->created_at = $created_at;
-        $this->setUpdatedAtvalue($created_at);
+        $this->created_at = new \DateTimeImmutable();
+        $this->updated_at = new \DateTimeImmutable();
     }
-    #[ORM\PreUpdate]
-    public function setUpdatedAtValue(\DateTimeImmutable $updated_at): void
+
+    #[ORM\PreUpdate] // Modification d'un objet de l'entité
+    public function setUpdatedAtValue(): void
     {
-        $this->updated_at = $updated_at;
+        $this->updated_at = new \DateTimeImmutable();
     }
-   
 
     public function getId(): ?int
     {
@@ -99,33 +107,6 @@ class Article
     public function setTitle(string $title): static
     {
         $this->title = $title;
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Block>
-     */
-    public function getBlocks(): Collection
-    {
-        return $this->blocks;
-    }
-
-    public function addBlock(Block $block): static
-    {
-        if (!$this->blocks->contains($block)) {
-            $this->blocks->add($block);
-            $block->addArticle($this);
-        }
-
-        return $this;
-    }
-
-    public function removeBlock(Block $block): static
-    {
-        if ($this->blocks->removeElement($block)) {
-            $block->removeArticle($this);
-        }
 
         return $this;
     }
@@ -239,6 +220,45 @@ class Article
     }
 
     /**
+     * @return Collection<int, Block>
+     */
+    public function getBlocks(): Collection
+    {
+        return $this->blocks;
+    }
+
+    public function addBlock(Block $block): static
+    {
+        if (!$this->blocks->contains($block)) {
+            $this->blocks->add($block);
+            $block->addArticle($this);
+        }
+
+        return $this;
+    }
+
+    public function removeBlock(Block $block): static
+    {
+        if ($this->blocks->removeElement($block)) {
+            $block->removeArticle($this);
+        }
+
+        return $this;
+    }
+
+    public function getAuthor(): ?User
+    {
+        return $this->author;
+    }
+
+    public function setAuthor(?User $author): static
+    {
+        $this->author = $author;
+
+        return $this;
+    }
+
+    /**
      * @return Collection<int, Comment>
      */
     public function getComments(): Collection
@@ -264,18 +284,6 @@ class Article
                 $comment->setArticle(null);
             }
         }
-
-        return $this;
-    }
-
-    public function getAuthor(): ?User
-    {
-        return $this->author;
-    }
-
-    public function setAuthor(?User $author): static
-    {
-        $this->author = $author;
 
         return $this;
     }
