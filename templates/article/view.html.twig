@@ -7,6 +7,13 @@
 
 
 {{ dump(article) }}
-<a href={{path('articles')}}>Retour</a>
+<a href={{path('articles')}}>Retour </a>
+<a href={{path('articles_edit',{'slug': article.slug})}}>Modifier</a>
+<a href={{path('articles')}}>Publier </a>
+<a href={{path('articles')}}>Archiver </a>
+
+<form action="#" methode="post">
+<button type="submit">Supprimer</button>
+</form>
 
 {% endblock %}
