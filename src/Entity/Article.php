@@ -23,21 +23,21 @@ class Article
     private ?string $title = null;
 
     #[ORM\Column(length: 255)]
-    #[Assert\Length(max: 255, minMessage: '{{ max }} caractères maximum')]
+    #[Assert\Length(max: 255, maxMessage: '{{ max }} caractères maximum')]
     #[Assert\Regex(pattern: '/^[a-z0-9-]+$/')]
     private ?string $slug = null;
     
     #[ORM\Column(length: 255)]
-    #[Assert\Length(max: 255, minMessage: '{{ max }} caractères maximum')]
+    #[Assert\Length(max: 255, maxMessage: '{{ max }} caractères maximum')]
     #[Assert\Regex(pattern: '/\.(jpg|jpeg|png|webp)$/')]
     private ?string $image = 'default.png';
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Length(max: 255, minMessage: '{{ max }} caractères maximum')]
+    #[Assert\Length(max: 255, maxMessage: '{{ max }} caractères maximum')]
     private ?string $keywords = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Length(max: 255, minMessage: '{{ max }} caractères maximum')]
+    #[Assert\Length(max: 255, maxMessage: '{{ max }} caractères maximum')]
     private ?string $description = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -70,6 +70,10 @@ class Article
      */
     #[ORM\OneToMany(targetEntity: Comment::class, mappedBy: 'article', orphanRemoval: true)]
     private Collection $comments;
+
+    #[ORM\ManyToOne(inversedBy: 'articles')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?Category $category = null;
 
     public function __construct()
     {
@@ -126,6 +130,15 @@ class Article
     public function getImage(): ?string
     {
         return $this->image;
+    }
+
+    public function getImagePath(): ?string
+    {
+        $path = '/medias/images/';
+        if ($this->image !== 'default.png') {
+            return $path . $this->image;
+        }
+        return $path = '/medias/images/' . 'default.png';
     }
 
     public function setImage(string $image): static
@@ -284,6 +297,18 @@ class Article
                 $comment->setArticle(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getCategory(): ?Category
+    {
+        return $this->category;
+    }
+
+    public function setCategory(?Category $category): static
+    {
+        $this->category = $category;
 
         return $this;
     }
