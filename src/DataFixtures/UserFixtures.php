@@ -18,11 +18,13 @@ class UserFixtures extends Fixture
     {
         $faker = Factory::create('fr_FR');
 
-        for ($i = 0; $i < 100; $i++) {
+        for ($i = 0; $i < 70; $i++) {
+
             $user = new User();
             $user
                 ->setEmail($faker->email())
-                ->setPassword($this->hasher->hashPassword($user,'admin'))
+                ->setUsername($faker->userName())
+                ->setPassword($this->hasher->hashPassword($user, 'admin'))
                 ->setWarningCount($faker->randomElement([0, 1, 2, 3]))
                 ->setIsBanned($faker->boolean(80))
                 ->setIsActive($faker->boolean(10))
@@ -30,7 +32,7 @@ class UserFixtures extends Fixture
                 ->setUpdatedAt(new \DateTimeImmutable())
             ;
             $manager->persist($user);
-            $this->addReference('USER' . $i, $user); // Ajoute l'objet dans un tableau temporaire dédié pendant le chargement des fixtures (KEY => VALUE)
+            $this->addReference('USER_' . $i, $user); // Ajoute l'objet dans un tableau temporaire dédié pendant le chargement des fixtures (KEY => VALUE)
         }
 
         $manager->flush();
