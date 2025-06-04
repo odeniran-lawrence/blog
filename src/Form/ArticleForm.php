@@ -13,6 +13,7 @@ use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
+use App\Entity\Category;
 
 class ArticleForm extends AbstractType
 {
@@ -21,6 +22,7 @@ class ArticleForm extends AbstractType
         $builder
             ->add('title', TextType::class,[])
             ->add('slug', TextType::class,[])
+            ->add('category', EntityType::class, ['class' => Category::class, 'choice_label' => 'name', 'required' => false])
             ->add('image', FileType::class, ['mapped' => false, 'required' => false])
             ->add('keywords',TextType::class,[])
             ->add('description', TextareaType::class,[])
