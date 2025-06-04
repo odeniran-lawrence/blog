@@ -42,6 +42,7 @@
         "symfony/twig-bundle": "7.2.*",
         "symfony/ux-icons": "^2.25",
         "symfony/ux-live-component": "^2.25",
+        "symfony/ux-swup": "*",
         "symfony/ux-turbo": "^2.25",
         "symfony/validator": "7.2.*",
         "symfony/web-link": "7.2.*",

@@ -98,7 +98,7 @@
                     </div>
                 {% endfor %}
             </div>
-            <form action="" method="post" class="col-span-1 bg-neutral-100 p-4 rounded-md border h-fit">
+            <form action="{{ path('comment_new',{ article: article.id })}}" method="post" class="col-span-1 bg-neutral-100 p-4 rounded-md border h-fit">
                 <h5 class="">Participez ou ouvrez la conversation en rédigeant un commentaire</h5>
 
                 <div class="border p-4 text-sm rounded-lg bg-slate-50 my-4">

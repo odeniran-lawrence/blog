@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use Throwable;
 use App\Entity\Article;
 use App\Form\ArticleForm;
 use App\Repository\ArticleRepository;
@@ -11,158 +10,211 @@ use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\HttpFoundation\Session\Flash\FlashBag;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 #[Route('/article')]
 final class ArticleController extends AbstractController
 {
-   
-    /**
-     * Le constructeur permet de déclarer les dépendances une fois
-     * et d'éviter la non-application du concept DRY (Don't Repeat Yourself)
-     */
     public function __construct(
-        private ArticleRepository $ar, // Repository de l'entité Article
-        private EntityManagerInterface $em // Gestionnaire d'entités avec Doctrine
+        private ArticleRepository $ar,
+        private EntityManagerInterface $em
     ) {}
 
     // Route "/articles" menant à la liste des articles
     #[Route('s', name: 'articles', methods: ['GET'])]
-    public function index(
-        PaginatorInterface $paginator, // Classe pour la fonctionnalité de pagination
-        Request $request // Classe pour récupérer les paramètres de la requête HTTP
-    ): Response {
-        $all = $this->ar->findBy(['is_published' => true, 'is_archived' => false]);
+    public function index(PaginatorInterface $paginator, Request $request): Response
+    {
+        $query = $this->ar->findBy(['is_published' => true, 'is_archived' => false], ['id' => 'DESC']);
         $pagination = $paginator->paginate(
-            $all,
+            $query,
             $request->query->getInt('page', 1),
-            100
+            12
         );
-
         return $this->render('article/index.html.twig', [
-            'controller_name' => 'INDEX',
             'articles' => $pagination
         ]);
     }
 
+    // Route "/article/new" pour créer un article
     #[Route('/new', name: 'article_new', methods: ['GET', 'POST'])]
     public function new(Request $request): Response
     {
-        $article = new Article();
-        $form = $this->createForm(ArticleForm::class, $article); // Mise en place du formulaire 
-        $form->handleRequest($request);
+        $article = new Article(); // Nouvel objet article vide
+        $form = $this->createForm(ArticleForm::class, $article); // Mise en place du formulaire
+        $form->handleRequest($request); // Traitement de la requête
 
-        // Traitement du formulaire 
+        // Traitement du formulaire
         if ($form->isSubmitted() && $form->isValid()) {
             $article->setAuthor($this->getUser()); // Récupération de l'utilisateur
             $this->em->persist($article); // Enregistrement de l'article (query SQL)
-            $this->em->flush($article); // Exécution de l'erregistrement en BDD
-            $this->addFlash('success', "L'article a été créé."); // Message flash succès
+            $this->em->flush($article); // Exécution de l'enregistrement en BDD
+            $this->addFlash('success', "L'article a été créé"); // Message Flash Success
             return $this->redirectToRoute('articles'); // Redirection vers l'article
         }
 
         return $this->render('article/new.html.twig', [
-            'articleForm' => $form // Envoi du formulaire à la vue
+            'articleForm' => $form, // Envoi du formulaire à la vue
         ]);
     }
 
-    // Route menant à un article
+    // Route "/article/{slug}" menant à un article
     #[Route('/{slug}', name: 'article', methods: ['GET'])]
     public function view(string $slug): Response
     {
+        $article = $this->ar->findOneBySlug($slug); // Récupération de l'article
+
+        if (!$article) {
+            $this->addFlash('error', "L'article n'existe pas");
+            return $this->redirectToRoute('articles');
+        }
+
+        if (!$article->isPublished()) {
+            if ($article->getAuthor() !== $this->getUser()) {
+                $this->addFlash('error', "L'article n'est pas accessible pour le moment."); 
+                return $this->redirectToRoute('articles');
+            }
+        }
+
         return $this->render('article/view.html.twig', [
-            'article' => $this->ar->findOneBySlug($slug)
+            'article' => $article
         ]);
     }
 
-    
-    // Route menant à la modification d'un article
+    // Route "/article/{slug}/edit" menant à la modification d'un article
     #[Route('/{slug}/edit', name: 'article_edit', methods: ['GET', 'POST'])]
     public function edit(string $slug, Request $request): Response
     {
         $article = $this->ar->findOneBySlug($slug); // Récupération de l'article
-        $form = $this->createForm(ArticleForm::class, $article); // Mise en place du formulaire
-        $form->handleRequest($request); // Traitement du formulaire
 
-        if ($form->isSubmitted() && $form->isValid()) {
+        if (!$article) {
+            $this->addFlash('error', "L'article n'existe pas");
+            return $this->redirectToRoute('articles');
+        }
+
+        $form = $this->createForm(ArticleForm::class, $article); // Mise en place du formulaire
+        $form->handleRequest($request); // Traitement de la requête
+
+        if ($form->isSubmitted() && $form->isValid()) // Si le form est soumis et valide
+        {
             try {
                 $this->em->persist($article); // Enregistrement de l'article (query SQL)
                 $this->em->flush($article); // Exécution de l'enregistrement en BDD
-                $this->addFlash('success', 'Modification bien prise en compte'); // Message flash (message d'information) 
+                $this->addFlash('success', 'Modification bien prise en compte'); // Message Flash Success
             } catch (\Throwable $th) {
-                $this->addFlash('error', 'La modification a rencontré une erreur');
+                $this->addFlash('error', 'La modification a rencontré une erreur'); // Message Flash Error
             }
-            return $this->redirectToRoute('article', ['slug' => $slug]); // Redirection vers la vue de l'article modifié
-        };
+
+            // Redirection vers l'article modifié
+            return $this->redirectToRoute('article', ['slug' => $slug]);
+        }
+
         return $this->render('article/edit.html.twig', [
-            'article' => $article, // Envoi de l'article à la vue
-            'articleForm' => $form // Envoi du formulaire à la vue
+            'articleForm' => $form, // Envoi du formulaire à la vue
+            'article' => $article
         ]);
     }
 
-    // Route pour publier un article
+    // Route "/article/{slug}/publish" pour publier un article
     #[Route('/{slug}/publish', name: 'article_publish', methods: ['GET'])]
     public function publish(string $slug): Response
     {
-        $article = $this->ar->findOneBySlug($slug);
+        $article = $this->ar->findOneBySlug($slug); // Récupération de l'article
 
-        if (!$article) { // Ignorer si l'article existe
+        if (!$article) { // Ce sera ignorer si l'article existe
             $this->addFlash('error', "L'article n'existe pas");
             return $this->redirectToRoute('articles');
         }
 
-        if ($article->isPublished()) {
-            $article->setIsPublished(false);
-        } else {
-            $article->setIsPublished(true);
+        if ($article->isPublished()) { // Si l'article est déjà publié
+            $article->setIsPublished(false); // On le met en brouillon
+        } else { // Sinon
+            $article->setIsPublished(true); // On le met en public
         }
 
-        $this->em->persist($article);
-        $this->em->flush($article);
+        $this->em->persist($article); // Enregistrement de l'article (query SQL)
+        $this->em->flush($article); // Exécution de l'enregistrement en BDD
+
+        // On créer un message flash
         $this->addFlash('success', $article->isPublished() ? "Article publié" : "Mis en brouillon");
+
+        // On redirige l'utilisateur vers l'article
         return $this->redirectToRoute('article', ['slug' => $slug]);
     }
 
-    // Route pour archiver un article
-    #[Route('/{slug}/archive', name: 'article_archive', methods: ['GET'])]
-    public function archive(string $slug): Response
+    // Route "/article/{slug}/archive" pour publier un article
+#[Route('/{slug}/archive', name: 'article_archive', methods: ['GET'])]
+public function archive(string $slug): Response
+{
+    $article = $this->ar->findOneBySlug($slug);
+
+    if (!$article) {
+        $this->addFlash('error', "L'article n'existe pas");
+        return $this->redirectToRoute('articles');
+    }
+
+    // Inversion de l'état archivé
+    $article->setIsArchived(!$article->isArchived());
+
+    $this->em->persist($article);
+    $this->em->flush();
+
+    $message = $article->isArchived()
+        ? "Article archivé avec succès"
+        : "Article désarchivé avec succès";
+
+    $this->addFlash('success', $message);
+
+    return $this->redirectToRoute('article', ['slug' => $slug]);
+}
+
+
+    // Route "/article/{slug}/status" pour publier ou archiver un article
+    #[Route('/{slug}/status', name: 'article_status', methods: ['GET'])]
+    public function status(string $slug, Request $request): Response
     {
-        // Récupérer l'article
-        $article = $this->ar->findOneBySlug($slug);
-        // Vérifier que l'article existe
-        if (!$article) { // Ignorer si l'article existe
+        $article = $this->ar->findOneBySlug($slug); // Récupération de l'article
+
+        if (!$article) { // Ce sera ignorer si l'article existe
             $this->addFlash('error', "L'article n'existe pas");
             return $this->redirectToRoute('articles');
         }
-        // Vérifier que l'article est archivé
-        if ($article->isArchived()) {
-            $article->setIsArchived(false); // Oui : Le désarchiver
+
+        $action = $request->query->get('s');
+
+        if($action === 'publish') {
+            $article->isPublished() ? $article->setIsPublished(false) : $article->setIsPublished(true);
+        } else if ($action === 'archive') {
+            $article->setIsArchived(!$article->isArchived());
         } else {
-            $article->setIsArchived(true); // Non : L'archiver
+            $this->addFlash('error', "Action non reconnue");
+            return $this->redirectToRoute('article', ['slug' => $slug]);
         }
-        // Enregistrer les modifications
-        $this->em->persist($article);
-        $this->em->flush($article);
-        // Rediriger vers l'article 
-        $this->addFlash('success', $article->isArchived() ? "Article archivé" : "Article désarchivé");
+
+        $this->em->persist($article); // Enregistrement de l'article (query SQL)
+        $this->em->flush($article); // Exécution de l'enregistrement en BDD
+
+        // On créer un message flash
+        $this->addFlash('success', "Enregistré avec succès");
+
+        // On redirige l'utilisateur vers l'article
         return $this->redirectToRoute('article', ['slug' => $slug]);
     }
 
+    // Route "/article/{slug}/status" pour publier ou archiver un article
     #[Route('/{slug}/delete', name: 'article_delete', methods: ['POST'])]
     public function delete(string $slug): Response
     {
-        $article = $this->ar->findOneBySlug($slug);
+        $article = $this->ar->findOneBySlug($slug); // Récupération de l'article
 
-        if (!$article) { // Ignorer si l'article existe
+        if (!$article) { // Ce sera ignorer si l'article existe
             $this->addFlash('error', "L'article n'existe pas");
             return $this->redirectToRoute('articles');
         }
 
-        $this->em->remove($article);
-        $this->em->flush($article);
+        $this->em->remove($article); // Suppression de l'article (query SQL)
+        $this->em->flush($article); // Exécution de l'enregistrement en BDD
 
-        $this->addFlash('success', 'Article supprimé avec succès');
+        $this->addFlash('success', "Article supprimé avec succès");
         return $this->redirectToRoute('articles');
     }
 }
