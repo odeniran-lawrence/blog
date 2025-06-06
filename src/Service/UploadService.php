@@ -12,22 +12,24 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  */
 class UploadService
 {
+    private array $typeArr = []; //initialisation du tableau
 
-    public function __construct(
-        private ParameterBagInterface $params,
-    ){}
-
-        public function upload(UploadedFile $file, string $type): string
-        {
-            $typeArr= [ // Tableau de ref pour les dossiers en focntion des types de fichiers
+    public function __construct(private ParameterBagInterface $params)
+    {
+        $this->typeArr = [ // Tableau de ref pour les dossiers en focntion des types de fichiers
                 'image' => $this->params->get('upload_folder') . '/images', 
                 'document' => $this->params->get('upload_folder') . '/docs', 
                 'other' => $this->params->get('upload_folder')
             ];
+    }
+
+        public function upload(UploadedFile $file, string $type): string
+        {
+           
 
             try {
                 $filename = uniqid($type . '-') . '.' . $file->guessExtension(); // Nom généré
-                $file->move($typeArr[$type], $filename); // Déplacement du fichier
+                $file->move($this->typeArr[$type], $filename); // Déplacement du fichier
             } catch (\Exception $err) {
                 return $err->getMessage();
             }
@@ -35,6 +37,19 @@ class UploadService
             return $filename; // Retourne le nom du fichier
         }
 
+        public function delete(string $filename, string $type)
+        {
+            $file = $this->typeArr[$type].'/'.$filename;
+            try {
+            if (file_exists($file)){
+                unlink($file);
+                return true;}
+            } catch (\Exception $err) {
+                return false; 
+            }
+        }
+        
+    }
+    
 
 
-}

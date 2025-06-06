@@ -4,8 +4,9 @@ namespace App\Controller;
 
 use App\Entity\Article;
 use App\Form\ArticleForm;
-use App\Repository\ArticleRepository;
+use Cocur\Slugify\Slugify;
 use App\Service\UploadService;
+use App\Repository\ArticleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -36,7 +37,7 @@ final class ArticleController extends AbstractController
         ]);
     }
 
-        // Route "/article/new" pour créer un article
+    // Route "/article/new" pour créer un article
     #[Route('/new', name: 'article_new', methods: ['GET', 'POST'])]
     public function new(Request $request, UploadService $us): Response
     {
@@ -47,7 +48,11 @@ final class ArticleController extends AbstractController
         // Traitement du formulaire
         if ($form->isSubmitted() && $form->isValid()) {
             $article->setAuthor($this->getUser()); // Récupération de l'utilisateur
-            
+
+            //Création du slug
+            $slugify = new Slugify();
+            $article->setSlug($slugify->slugify($article->getTitle()));
+
             if ($image = $form->get('image')->getData()) {
                 $article->setImage($us->upload($image, 'image'));
             }
@@ -77,7 +82,7 @@ final class ArticleController extends AbstractController
 
         if (!$article->isPublished()) {
             if ($article->getAuthor() !== $this->getUser()) {
-                $this->addFlash('error', "L'article n'est pas accessible pour le moment."); 
+                $this->addFlash('error', "L'article n'est pas accessible pour le moment.");
                 return $this->redirectToRoute('articles');
             }
         }
@@ -89,7 +94,7 @@ final class ArticleController extends AbstractController
 
     // Route "/article/{slug}/edit" menant à la modification d'un article
     #[Route('/{slug}/edit', name: 'article_edit', methods: ['GET', 'POST'])]
-    public function edit(string $slug, Request $request): Response
+    public function edit(string $slug, Request $request, UploadService $us): Response
     {
         $article = $this->ar->findOneBySlug($slug); // Récupération de l'article
 
@@ -101,9 +106,13 @@ final class ArticleController extends AbstractController
         $form = $this->createForm(ArticleForm::class, $article); // Mise en place du formulaire
         $form->handleRequest($request); // Traitement de la requête
 
+
         if ($form->isSubmitted() && $form->isValid()) // Si le form est soumis et valide
         {
             try {
+                if ($image = $form->get('image')->getData()) {
+                    $article->setImage($us->upload($image, 'image'));
+                }
                 $this->em->persist($article); // Enregistrement de l'article (query SQL)
                 $this->em->flush($article); // Exécution de l'enregistrement en BDD
                 $this->addFlash('success', 'Modification bien prise en compte'); // Message Flash Success
@@ -149,30 +158,30 @@ final class ArticleController extends AbstractController
     }
 
     // Route "/article/{slug}/archive" pour publier un article
-#[Route('/{slug}/archive', name: 'article_archive', methods: ['GET'])]
-public function archive(string $slug): Response
-{
-    $article = $this->ar->findOneBySlug($slug);
+    #[Route('/{slug}/archive', name: 'article_archive', methods: ['GET'])]
+    public function archive(string $slug): Response
+    {
+        $article = $this->ar->findOneBySlug($slug);
 
-    if (!$article) {
-        $this->addFlash('error', "L'article n'existe pas");
-        return $this->redirectToRoute('articles');
+        if (!$article) {
+            $this->addFlash('error', "L'article n'existe pas");
+            return $this->redirectToRoute('articles');
+        }
+
+        // Inversion de l'état archivé
+        $article->setIsArchived(!$article->isArchived());
+
+        $this->em->persist($article);
+        $this->em->flush();
+
+        $message = $article->isArchived()
+            ? "Article archivé avec succès"
+            : "Article désarchivé avec succès";
+
+        $this->addFlash('success', $message);
+
+        return $this->redirectToRoute('article', ['slug' => $slug]);
     }
-
-    // Inversion de l'état archivé
-    $article->setIsArchived(!$article->isArchived());
-
-    $this->em->persist($article);
-    $this->em->flush();
-
-    $message = $article->isArchived()
-        ? "Article archivé avec succès"
-        : "Article désarchivé avec succès";
-
-    $this->addFlash('success', $message);
-
-    return $this->redirectToRoute('article', ['slug' => $slug]);
-}
 
 
     // Route "/article/{slug}/status" pour publier ou archiver un article
@@ -188,7 +197,7 @@ public function archive(string $slug): Response
 
         $action = $request->query->get('s');
 
-        if($action === 'publish') {
+        if ($action === 'publish') {
             $article->isPublished() ? $article->setIsPublished(false) : $article->setIsPublished(true);
         } else if ($action === 'archive') {
             $article->setIsArchived(!$article->isArchived());
